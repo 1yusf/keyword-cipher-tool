@@ -1,6 +1,7 @@
 # keyword-cipher-tool
 A simple HTML tool that encrypts and decrypts messages using a keyword-based substitution cipher. Works on all devices.
 
+<img width="649" height="489" alt="Screenshot 2026-06-10 025957" src="https://github.com/user-attachments/assets/19c9292d-b7d6-4293-88cf-8e88253d38ef" />
 
 ## Features
 
@@ -27,10 +28,6 @@ A simple HTML tool that encrypts and decrypts messages using a keyword-based sub
 - **Input:** HELLO
 - **Output:** FADDP
 
-## Tech
 
-Built entirely in a single HTML file with embedded CSS and JavaScript.
 
----
-
-**No installation needed – just open in a browser.**
+**No installation needed – just open in any browser.**
