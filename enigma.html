@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Enigma Machine</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #00ff96;
+    --green-dim: rgba(0,255,150,0.15);
+    --green-faint: rgba(0,255,150,0.05);
+    --bg: #080810;
+    --card: #0d0d18;
+    --border: rgba(0,255,150,0.18);
+    --text: #e0ffe8;
+    --muted: rgba(255,255,255,0.25);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* scanlines */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,150,0.012) 2px, rgba(0,255,150,0.012) 4px);
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* glow blob */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 700px; height: 500px;
+    background: radial-gradient(ellipse, rgba(0,255,120,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    width: 100%;
+    max-width: 780px;
+    padding: 0 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 52px 0 36px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header-left .eyebrow {
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: var(--green);
+    opacity: 0.5;
+    margin-bottom: 8px;
+  }
+
+  .header-left h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+
+  .header-left h1 span { color: var(--green); }
+
+  .header-right {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    padding: 12px 24px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: -1px;
+  }
+
+  .tab-btn:hover { color: var(--green); opacity: 0.7; }
+  .tab-btn.active { color: var(--green); border-bottom-color: var(--green); background: var(--green-faint); }
+
+  /* ── PANELS ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── GRID LAYOUT for cipher panel ── */
+  .cipher-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 560px) { .cipher-grid { grid-template-columns: 1fr; } }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px;
+  }
+
+  .card-full { grid-column: 1 / -1; }
+
+  /* ── LABELS ── */
+  .label {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--green);
+    opacity: 0.55;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* ── INPUTS ── */
+  input[type=text], textarea {
+    width: 100%;
+    background: rgba(0,255,150,0.03);
+    border: 1px solid rgba(0,255,150,0.2);
+    border-radius: 6px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 1px;
+    outline: none;
+    transition: border 0.2s;
+    caret-color: var(--green);
+  }
+
+  input[type=text]:focus, textarea:focus { border-color: rgba(0,255,150,0.5); }
+
+  textarea { resize: none; min-height: 120px; line-height: 1.7; }
+
+  .hint {
+    font-size: 10px;
+    letter-spacing: 1px;
+    margin-top: 6px;
+    height: 16px;
+    transition: all 0.2s;
+  }
+  .hint.ok { color: rgba(0,255,150,0.5); }
+  .hint.err { color: #ff6060; }
+
+  /* ── MODE TOGGLE ── */
+  .mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: none;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .mode-btn.active {
+    border-color: var(--green);
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  /* ── OUTPUT BOX ── */
+  .output-wrap { position: relative; }
+
+  .output-box {
+    background: rgba(0,255,150,0.04);
+    border: 1px solid rgba(0,255,150,0.22);
+    border-radius: 6px;
+    padding: 16px;
+    min-height: 80px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
+    line-height: 1.8;
+    color: var(--green);
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  .output-box.empty { color: rgba(255,255,255,0.15); font-style: italic; letter-spacing: 0.5px; }
+
+  /* ── ACTION BUTTONS ── */
+  .action-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 7px;
+    border: 1px solid rgba(0,255,150,0.35);
+    background: var(--green-dim);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:hover { background: rgba(0,255,150,0.25); }
+  .btn:disabled { opacity: 0.3; cursor: default; }
+
+  .btn.danger {
+    border-color: rgba(255,80,80,0.3);
+    background: rgba(255,80,80,0.06);
+    color: #ff6666;
+  }
+
+  .btn.danger:hover { background: rgba(255,80,80,0.15); }
+
+  /* ── MAPPING GRID ── */
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+    gap: 7px;
+    margin-top: 16px;
+  }
+
+  .map-cell {
+    background: var(--green-faint);
+    border: 1px solid rgba(0,255,150,0.1);
+    border-radius: 5px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+
+  .map-from { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+  .map-to   { font-size: 15px; color: var(--green); font-family: 'Orbitron', monospace; font-weight: 700; }
+
+  /* ── SAVED KEYS ── */
+  .divider { height: 1px; background: var(--border); margin: 28px 0; }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: rgba(255,255,255,0.15);
+    font-size: 11px;
+    letter-spacing: 3px;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--green);
+    color: #060610;
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+  }
+
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <div class="eyebrow">⬡ Personal Cipher System</div>
+      <h1>ENIG<span>MA</span></h1>
+    </div>
+    <div class="header-right">
+      VERSION 2.6<br>
+      KEYWORD-BASED<br>
+      SUBSTITUTION CIPHER<br>
+      <span style="color:var(--green);opacity:0.7;font-size:11px;letter-spacing:2px;">created by 1yusf</span>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('cipher', this)">🔐 Cipher</button>
+    <button class="tab-btn" onclick="switchTab('mapping', this)">🗺 Mapping</button>
+  </div>
+
+  <!-- ── CIPHER PANEL ── -->
+  <div id="panel-cipher" class="panel active">
+    <div class="cipher-grid">
+
+      <!-- Keyword -->
+      <div class="card">
+        <span class="label">Secret Keyword</span>
+        <input type="text" id="keyword" placeholder="enter your keyword..." oninput="onKeywordInput()" spellcheck="false" autocomplete="off"/>
+        <div id="kw-hint" class="hint"></div>
+
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="btn-encrypt" onclick="setMode('encrypt')">🔒 Encrypt</button>
+          <button class="mode-btn" id="btn-decrypt" onclick="setMode('decrypt')">🔓 Decrypt</button>
+        </div>
+      </div>
+
+      <!-- Input message -->
+      <div class="card">
+        <span class="label" id="input-label">Your Message</span>
+        <textarea id="msg-input" placeholder="type your message here..." oninput="processText()" spellcheck="false"></textarea>
+      </div>
+
+      <!-- Output -->
+      <div class="card card-full">
+        <span class="label" id="output-label">Encrypted Output</span>
+        <div class="output-wrap">
+          <div class="output-box empty" id="output-box">enter a keyword and a message to see output...</div>
+        </div>
+        <div class="action-row">
+          <button class="btn" id="copy-btn" onclick="copyOutput()" disabled>⎘ Copy Output</button>
+          <button class="btn" onclick="clearAll()">↺ Clear All</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── MAPPING PANEL ── -->
+  <div id="panel-mapping" class="panel">
+    <div class="card" style="margin-bottom:24px">
+      <span class="label">Keyword to Visualize</span>
+      <input type="text" id="map-keyword" placeholder="enter a keyword to see its letter mapping..." oninput="renderMapping()" spellcheck="false" autocomplete="off"/>
+    </div>
+    <div class="card">
+      <span class="label">Letter Map (plain → cipher)</span>
+      <div id="map-grid" class="map-grid">
+        <div class="empty-state" style="grid-column:1/-1">ENTER A KEYWORD ABOVE</div>
+      </div>
+    </div>
+  </div>
+
+
+
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let mode = 'encrypt';
+let lastOutput = '';
+
+// ─── Cipher Engine ──────────────────────────────────────────────────────────
+function generateMapping(keyword) {
+  const alpha = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  const clean = [...new Set(keyword.toLowerCase().replace(/[^a-z]/g, '').split(''))];
+  const remaining = alpha.filter(c => !clean.includes(c));
+  const shuffled = [...clean, ...remaining];
+  const enc = {}, dec = {};
+  alpha.forEach((ch, i) => { enc[ch] = shuffled[i]; dec[shuffled[i]] = ch; });
+  return { enc, dec };
+}
+
+function cipher(text, map) {
+  return text.split('').map(ch => {
+    const lo = ch.toLowerCase();
+    if (map[lo]) return ch === ch.toUpperCase() ? map[lo].toUpperCase() : map[lo];
+    return ch;
+  }).join('');
+}
+
+// ─── UI Helpers ─────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'mapping') {
+    const kw = document.getElementById('keyword').value;
+    if (kw) { document.getElementById('map-keyword').value = kw; renderMapping(); }
+  }
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-encrypt').classList.toggle('active', m === 'encrypt');
+  document.getElementById('btn-decrypt').classList.toggle('active', m === 'decrypt');
+  document.getElementById('input-label').textContent  = m === 'encrypt' ? 'Your Message' : 'Cipher Text';
+  document.getElementById('output-label').textContent = m === 'encrypt' ? 'Encrypted Output' : 'Decrypted Output';
+  document.getElementById('msg-input').placeholder    = m === 'encrypt' ? 'type your message here...' : 'paste cipher text here...';
+  processText();
+}
+
+// ─── Cipher Processing ──────────────────────────────────────────────────────
+function onKeywordInput() {
+  const input = document.getElementById('keyword');
+  const raw = input.value;
+  const hint = document.getElementById('kw-hint');
+
+  // Block anything that isn't a letter
+  if (/[^a-zA-Z]/.test(raw)) {
+    input.value = raw.replace(/[^a-zA-Z]/g, '');
+    hint.textContent = '⚠ only letters are allowed in the keyword';
+    hint.className = 'hint err';
+    setTimeout(() => { if (hint.textContent.includes('only letters')) onKeywordInput(); }, 2000);
+    processText();
+    return;
+  }
+
+  const kw = input.value.trim();
+  if (!kw) { hint.textContent = ''; hint.className = 'hint'; }
+  else if (kw.length < 2) { hint.textContent = '↳ need at least 2 characters'; hint.className = 'hint err'; }
+  else { hint.textContent = '✓ mapping active · 26 letters remapped'; hint.className = 'hint ok'; }
+  processText();
+}
+
+function processText() {
+  const kw  = document.getElementById('keyword').value.trim();
+  const msg = document.getElementById('msg-input').value;
+  const box = document.getElementById('output-box');
+  const copyBtn = document.getElementById('copy-btn');
+
+  if (!kw || kw.length < 2 || !msg.trim()) {
+    const ph = !kw || kw.length < 2 ? 'enter a keyword first...' : 'type a message to see output...';
+    box.textContent = ph;
+    box.className = 'output-box empty';
+    copyBtn.disabled = true;
+    return;
+  }
+
+  const { enc, dec } = generateMapping(kw);
+  const result = cipher(msg, mode === 'encrypt' ? enc : dec);
+  lastOutput = result;
+  box.textContent = result;
+  box.className = 'output-box';
+  copyBtn.disabled = false;
+}
+
+function copyOutput() {
+  if (!lastOutput) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(lastOutput).then(() => showToast('COPIED!')).catch(() => fallbackCopy(lastOutput));
+  } else {
+    fallbackCopy(lastOutput);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('COPIED!');
+  } catch(e) {
+    showToast('COPY FAILED');
+  }
+  document.body.removeChild(ta);
+}
+
+function clearAll() {
+  lastOutput = '';
+  document.getElementById('keyword').value = '';
+  document.getElementById('msg-input').value = '';
+  document.getElementById('kw-hint').textContent = '';
+  document.getElementById('kw-hint').className = 'hint';
+  processText();
+}
+
+// ─── Mapping Visualizer ─────────────────────────────────────────────────────
+function renderMapping() {
+  const kw   = document.getElementById('map-keyword').value.trim();
+  const grid = document.getElementById('map-grid');
+  if (!kw || kw.length < 2) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">ENTER A KEYWORD ABOVE</div>';
+    return;
+  }
+  const { enc } = generateMapping(kw);
+  const alpha = 'abcdefghijklmnopqrstuvwxyz'.split('');
+  grid.innerHTML = alpha.map(ch => `
+    <div class="map-cell">
+      <div class="map-from">${ch.toUpperCase()}</div>
+      <div class="map-to">${enc[ch].toUpperCase()}</div>
+    </div>`).join('');
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+</script>
+</body>
+</html>
