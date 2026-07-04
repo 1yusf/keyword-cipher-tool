@@ -30,4 +30,4 @@ A simple HTML tool that encrypts and decrypts messages using a keyword-based sub
 
 
 
-**No installation needed – just open in any browser.**
+**No installation needed just open in any browser.**
